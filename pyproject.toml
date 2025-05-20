@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "llm-ops"
+version = "0.1.0"
+description = ""
+authors = ["Mackenzie van Zanden <macktvz@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+python-dotenv = "^1.1.0"
+openai = "^1.78.0"
+ollama = "^0.4.8"
+langchain-core = "^0.3.60"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
