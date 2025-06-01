@@ -6,6 +6,12 @@ taking care of as much of the boilerplate as possible and abstracting away the c
 Why not Langchain or similar? Langchain does not support all the models we want to use and I believe it is more complicated than necessary for our purposes. This library allows us to iterate more quickly on the
 solutions to our problems.
 
+# Using Models
+
+## OpenAI
+
+Create a copy of `.env.template` named `.env` and fill in your openai api key.
+
 # Use
 
 ## Prompt
@@ -18,10 +24,6 @@ print(Prompt(instruction).make(name="Marios", thing="Pirate"))
 # prints:
 # Please write a poem about someone called Marios while speaking like a Pirate
 ```
-
-## Environment Variables
-
-See `.env.template` for a list of environment variables that may need to be set to use the models.
 
 ## Message
 
@@ -146,3 +148,5 @@ Having solved quite a few problems with LLMs, the most effective way to use them
 4. Setup virtualenv instructions
 5. Test everything except Prompt
 6. .env.template
+7. ollama login instructions README
+8. RAG stuff (started but not yet included because I want to think more on the interface)

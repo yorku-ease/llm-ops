@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "llm-ops"
+name = "llm_ops"
 version = "0.1.0"
 description = ""
 authors = ["Mackenzie van Zanden <macktvz@gmail.com>"]
