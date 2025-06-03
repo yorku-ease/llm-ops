@@ -1,4 +1,4 @@
-from llm_ops.message import Message
+from llm_ops.message import Message, ToolCallMessage
 from llm_ops.tool import Tool, ToolCall
 from openai import OpenAI
 from ollama import chat
@@ -18,16 +18,24 @@ class OpenAIModel:
         self._model = OpenAI()
         self.model_type = model_type
 
-    def generate(self, input: str):
-        return self._generate(input)
-
-    def tool_to_openai_tool(self, tool: Tool):
-        return {"type": "function"}
+    def tool_to_openai_tool(self, tool: Tool): 
+        args_schema = tool.args_schema
+        return {
+            "type": "function",
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": {
+                "type": "object",
+                "properties": args_schema,
+                "required": [k for k in args_schema if "default" not in args_schema[k]],
+                "additionalProperties": False
+            }
+        }
 
     def _make_tool_output_message(self, oai_tool_call, output):
         return {
             "type": "function_call_output",
-            "call_id": oai_tool_call["call_id"],
+            "call_id": oai_tool_call.call_id,
             "output": str(output)
         }
 
@@ -47,7 +55,7 @@ class OpenAIModel:
                 # first add tool call messages
                 oai_tool_calls = m.tool_call_msg._orig_msg
                 oai_messages += oai_tool_calls
-                for tool_output, oai_tool_call in zip(m.tool_outputs.values(), oai_tool_calls):
+                for tool_output, oai_tool_call in zip(m.tool_outputs, oai_tool_calls):
                     oai_messages.append(
                         self._make_tool_output_message(oai_tool_call, tool_output)
                     )
@@ -65,7 +73,7 @@ class OpenAIModel:
                 fn_name = o.name
                 params = json.loads(o.arguments)
                 tool_calls.append(ToolCall(fn_name, params))
-            message = Message("assistant", None, "tool_call", tool_calls, output)
+            message = ToolCallMessage(tool_calls, output)
             if any(o.type != "function_call" for o in output):
                 print("Mix of tool calls and text messages, Mackenzie needs to fix")
         elif len(output) > 1:
@@ -75,7 +83,7 @@ class OpenAIModel:
         
         return message
 
-    def _generate(self, messages, tools = None):
+    def generate(self, messages, tools = None):
         # TODO: retry on diff errors (rate limit, connection failure)
 
         if tools is not None:
@@ -125,3 +133,27 @@ if __name__ == "__main__":
     print(openai.__version__)
     msgs = [Message("user", "Say only the word 'Hello'")]
     assert(OpenAIModel().generate(msgs).content == 'Hello')
+
+
+    @Tool.from_fn
+    def test_fn(a: int) -> int:
+        """This is a function for testing function calling.
+        
+        Args:
+            a (int): This is the sole argument to the function
+        
+        Returns:
+            int: The thing returned by the function
+        """
+        return a
+    
+    print(test_fn.arg_types)
+    
+    msgs = [Message("user", "Please call the function test_fn with a=3 and print the result")]
+    response = OpenAIModel().generate(msgs, tools=[test_fn])
+    assert(type(response) == ToolCallMessage)
+    response_out = response.to_tool_output([test_fn])
+    print(OpenAIModel().generate(msgs + [response_out], tools=[test_fn]).content)
+    exit()
+    assert(OpenAIModel().generate(msgs + [response_out], tools=[test_fn]).content == "3")
+

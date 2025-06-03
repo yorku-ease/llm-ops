@@ -23,7 +23,7 @@ class ToolCallMessage(Message):
 
 class ToolOutputMessage(Message):
     type = "tool_output"
-    def __init__(self, tool_call_msg: ToolCallMessage, tool_outputs: dict):
+    def __init__(self, tool_call_msg: ToolCallMessage, tool_outputs: list):
         super().__init__(None, None)
         self.tool_call_msg = tool_call_msg # tool call associated with these outputs
         self.tool_outputs = tool_outputs

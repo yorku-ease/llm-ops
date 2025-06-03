@@ -146,7 +146,5 @@ Having solved quite a few problems with LLMs, the most effective way to use them
 2. Specifying an output format for an LLMFunction (e.g. make sure it returns an int, or a dict with specific keys, etc)
 3. Print tool calls in LLMFunctions to aid in debugging our solutions
 4. Setup virtualenv instructions
-5. Test everything except Prompt
-6. .env.template
-7. ollama login instructions README
-8. RAG stuff (started but not yet included because I want to think more on the interface)
+5. ollama login instructions README
+6. RAG stuff (started but not yet included because I want to think more on the interface)

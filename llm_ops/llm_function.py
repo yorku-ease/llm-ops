@@ -1,7 +1,7 @@
-from .prompt import Prompt
-from .model import Model
-from .message import Message, ToolOutputMessage
-from .tool import Tool, get_tool_outputs
+from llm_ops.prompt import Prompt
+from llm_ops.model import Model
+from llm_ops.message import Message, ToolOutputMessage
+from llm_ops.tool import Tool, get_tool_outputs
 
 
 class LLMFunction:
@@ -23,13 +23,13 @@ class LLMFunction:
     def call(self, **inputs):
         return self(**inputs)
 
-    def __call__(self, **inputs):
+    def __call__(self, **inputs) -> str:
         model_input = self.prompt.make(**inputs)
         input_messages = self.messages + [Message("user", model_input)]
 
         # handle tool calls until model provides answer
         while True:
-            model_output = self.model.generate(input_messages)
+            model_output = self.model.generate(input_messages, tools=self.tools)
             
             if model_output.type == "text":
                 break
@@ -41,3 +41,22 @@ class LLMFunction:
         return model_output.content
 
 
+if __name__ == "__main__":
+    @Tool.from_fn
+    def test_fn(a: int, b: int = None) -> int:
+        """This is a test fn.
+        
+        This is more description.
+
+        Args:
+            a (int): Input to the function
+
+        Returns:
+            int: The thing returned by the function
+        """
+        return a
+
+    p = Prompt("Call the function test_fn and return the result")
+    from llm_ops.model import OpenAIModel
+    llm_fn = LLMFunction(p, OpenAIModel(), tools = [test_fn])
+    print(llm_fn())
