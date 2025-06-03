@@ -112,30 +112,34 @@ class LLamaModel:
     
     def tool_to_llama_tool(self, tool: Tool):
         tool_dict = OpenAIModel.tool_to_openai_tool(tool)
-        tool_dict.pop("additionalProperties")
+        tool_dict["parameters"].pop("additionalProperties")
+        tool_dict["function"] = {}
+        for k in ["name", "description", "parameters"]:
+            tool_dict["function"][k] = tool_dict.pop(k)
+        from pprint import pprint
         return tool_dict
 
     def _make_tool_output_message(self, tool_call, tool_output):
         return {
             "role": "tool",
             "content": str(tool_output),
-            "name": tool_call.name
+            "name": tool_call.function.name
         }
 
     def _messages_to_dict(self, messages) -> list[dict]:
-        messages = []
+        l_messages = []
         for m in messages:
             if m.type == "text":
-                messages.append({"role": m.role, "content": m.content})
+                l_messages.append({"role": m.role, "content": m.content})
             else: # should have tool output
-                orig_tool_calls = m.tool_call._orig_msg
-                messages += orig_tool_calls
-                for tool_output, tool_call in zip(m.tool_outputs, orig_tool_calls):
-                    messages.append(
+                orig_tool_calls = m.tool_call_msg._orig_msg
+                l_messages.append(orig_tool_calls)
+                for tool_output, tool_call in zip(m.tool_outputs, orig_tool_calls.tool_calls):
+                    l_messages.append(
                         self._make_tool_output_message(tool_call, tool_output)
                     )
         
-        return messages
+        return l_messages
     
     def _llm_output_to_message(self, llm_output) -> Message:
         message = None
@@ -161,16 +165,10 @@ class LLamaModel:
             tools=tools
         )
 
-        return Message("assistant", chat_completion.message.content)
+        return self._llm_output_to_message(chat_completion)
 
     
 if __name__ == "__main__":
-    import openai
-    print(openai.__version__)
-    msgs = [Message("user", "Say only the word 'Hello'")]
-    assert(OpenAIModel().generate(msgs).content == 'Hello')
-
-
     @Tool.from_fn
     def test_fn(a: int) -> int:
         """This is a function for testing function calling.
@@ -183,13 +181,16 @@ if __name__ == "__main__":
         """
         return a
     
-    print(test_fn.arg_types)
+    def test_tool_call(model):
+        msgs = [Message("user", "Please call the tool test_fn with a=3 and print the result")]
+        response = model.generate(msgs, tools=[test_fn])
+        assert(type(response) == ToolCallMessage)
+        response_out = response.to_tool_output([test_fn])
+        print(model.generate(msgs + [response_out], tools=[test_fn]).content)
     
-    msgs = [Message("user", "Please call the function test_fn with a=3 and print the result")]
-    response = OpenAIModel().generate(msgs, tools=[test_fn])
-    assert(type(response) == ToolCallMessage)
-    response_out = response.to_tool_output([test_fn])
-    print(OpenAIModel().generate(msgs + [response_out], tools=[test_fn]).content)
-    exit()
-    assert(OpenAIModel().generate(msgs + [response_out], tools=[test_fn]).content == "3")
+    test_tool_call(OpenAIModel())
+    test_tool_call(LLamaModel("llama3.2"))
+
+
+
 
