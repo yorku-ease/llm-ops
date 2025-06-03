@@ -18,7 +18,8 @@ class OpenAIModel:
         self._model = OpenAI()
         self.model_type = model_type
 
-    def tool_to_openai_tool(self, tool: Tool): 
+    @classmethod
+    def tool_to_openai_tool(cls, tool: Tool): 
         args_schema = tool.args_schema
         return {
             "type": "function",
@@ -110,11 +111,46 @@ class LLamaModel:
         self.model_type = model_type
     
     def tool_to_llama_tool(self, tool: Tool):
-        return {"type": "function"}
+        tool_dict = OpenAIModel.tool_to_openai_tool(tool)
+        tool_dict.pop("additionalProperties")
+        return tool_dict
 
-    def _messages_to_dict(self, messages) -> dict:
-        pass
+    def _make_tool_output_message(self, tool_call, tool_output):
+        return {
+            "role": "tool",
+            "content": str(tool_output),
+            "name": tool_call.name
+        }
 
+    def _messages_to_dict(self, messages) -> list[dict]:
+        messages = []
+        for m in messages:
+            if m.type == "text":
+                messages.append({"role": m.role, "content": m.content})
+            else: # should have tool output
+                orig_tool_calls = m.tool_call._orig_msg
+                messages += orig_tool_calls
+                for tool_output, tool_call in zip(m.tool_outputs, orig_tool_calls):
+                    messages.append(
+                        self._make_tool_output_message(tool_call, tool_output)
+                    )
+        
+        return messages
+    
+    def _llm_output_to_message(self, llm_output) -> Message:
+        message = None
+        if "tool_calls" in llm_output["message"]:
+            tool_calls = []
+            for tc in llm_output["message"]["tool_calls"]:
+                fn_name = tc["function"]["name"]
+                arguments = tc["function"]["arguments"]
+                tool_calls.append(ToolCall(fn_name, arguments))
+            message = ToolCallMessage(tool_calls, llm_output["message"])
+        else:
+            message = Message("assistant", llm_output["message"]["content"])
+        
+        return message
+    
     def generate(self, messages, tools) -> Message:
         if tools is not None:
             tools = [self.tool_to_llama_tool(t) for t in tools]
