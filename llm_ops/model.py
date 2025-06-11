@@ -8,6 +8,10 @@ import json
 
 load_dotenv()
 
+# TODO: A better default behaviour for model responses containing function calls might be 
+#  to return only function calls but allow for text output to be included as well, returning it to the model
+#  but not to the user
+
 class Model:
     def generate(self, messages: list[Message], tools = None) -> Message:
         pass
@@ -65,7 +69,7 @@ class OpenAIModel:
 
     def _llm_output_to_message(self, llm_response):
         output = llm_response.output
-
+        print("MODEL_OUTPUT", output)
         message=None
         # making sure things are as I think they are, will clean up once I confirm
         if any(o.type == "function_call" for o in output): # then all the outputs should be tool calls, create tool_call message
@@ -74,11 +78,12 @@ class OpenAIModel:
                 fn_name = o.name
                 params = json.loads(o.arguments)
                 tool_calls.append(ToolCall(fn_name, params))
+
             message = ToolCallMessage(tool_calls, output)
+
             if any(o.type != "function_call" for o in output):
                 print("Mix of tool calls and text messages, Mackenzie needs to fix")
-        elif len(output) > 1:
-            print("Error: No tool calls in output (so all output is text) but there is more than message in output, Mackenzie needs to fix")
+                
         else: # message is text output as expected if there are no function calls
             message = Message("assistant", llm_response.output_text)
         

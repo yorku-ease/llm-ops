@@ -1,7 +1,9 @@
 from llm_ops.prompt import Prompt
 from llm_ops.model import Model
 from llm_ops.message import Message, ToolOutputMessage
+from llm_ops.output_parsing import llm_output_to_pydantic, pydantic_format_instructions
 from llm_ops.tool import Tool, get_tool_outputs
+from pydantic import BaseModel
 
 
 class LLMFunction:
@@ -12,9 +14,17 @@ class LLMFunction:
     as input the inputs to the prompt as keywords and outputs the output of the LLM. If tools are provided
     then the answer from the llm is returned after it makes as many tool calls as desired.
     """
-    def __init__(self, prompt: Prompt, model: Model, tools: list[Tool] = None, system_prompt: str =None):
+    def __init__(
+            self, 
+            prompt: Prompt, 
+            model: Model, 
+            output_model: type[BaseModel] = None, 
+            tools: list[Tool] = None, 
+            system_prompt: str = None
+        ):
         self.prompt = prompt
         self.model = model
+        self.output_model = output_model
         self.tools = tools
         self.messages = []
         if system_prompt is not None:
@@ -25,6 +35,9 @@ class LLMFunction:
 
     def __call__(self, **inputs) -> str:
         model_input = self.prompt.make(**inputs)
+        if self.output_model is not None:
+            model_input += '\n' + pydantic_format_instructions(self.output_model)
+
         input_messages = self.messages + [Message("user", model_input)]
 
         # handle tool calls until model provides answer
@@ -38,7 +51,11 @@ class LLMFunction:
             tool_outputs = get_tool_outputs(self.tools, tool_calls)
             input_messages += [ToolOutputMessage(model_output, tool_outputs)]
 
-        return model_output.content
+        output = model_output.content
+        if self.output_model is not None:
+            output = llm_output_to_pydantic(output, self.output_model)
+
+        return output
 
 
 if __name__ == "__main__":
@@ -55,8 +72,10 @@ if __name__ == "__main__":
             int: The thing returned by the function
         """
         return a
-
-    p = Prompt("Call the function test_fn and return the result")
+    class TestModel(BaseModel):
+        fn_result: int
+    p = Prompt("Call the function test_fn with a=2 and return the result and set the result as the fn_result property")
     from llm_ops.model import OpenAIModel
-    llm_fn = LLMFunction(p, OpenAIModel(), tools = [test_fn])
+    llm_fn = LLMFunction(p, OpenAIModel(), output_model=TestModel, tools = [test_fn])
     print(llm_fn())
+
