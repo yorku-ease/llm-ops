@@ -69,7 +69,6 @@ class OpenAIModel:
 
     def _llm_output_to_message(self, llm_response):
         output = llm_response.output
-        print("MODEL_OUTPUT", output)
         message=None
         # making sure things are as I think they are, will clean up once I confirm
         if any(o.type == "function_call" for o in output): # then all the outputs should be tool calls, create tool_call message
